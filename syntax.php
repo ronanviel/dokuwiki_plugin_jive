@@ -27,10 +27,18 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 
 	
 	/**
+	 * What type of XHTML do we create?
+	 */
+	function getPType() {
+		return 'block';
+	}
+	
+	
+	/**
 	 * Where to sort in?
 	 */
 	function getSort(){
-		return 329;
+		return 105;
 	}
 	 
 	 
@@ -38,7 +46,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 * Connect lookup pattern to lexer.
 	 */
 	function connectTo($mode) {
-		$this->Lexer->addSpecialPattern('{{jive>}}',$mode,'plugin_jive');
+		$this->Lexer->addSpecialPattern('\{\{jive>[^}]*\}\}',$mode,'plugin_jive');
 	}
 	 
 	   
@@ -66,7 +74,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 */
 	function render($mode, &$renderer, $data) {
 		if($mode == 'xhtml'){
-			$renderer->doc .= '<div class="jive">Discussion Jive</div>';
+			$renderer->doc .= '<p>Discussion Jive</p>';
 			return true;
 		}
 		return false;
