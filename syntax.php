@@ -88,7 +88,24 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	}
 	
 	
-
+	/**
+	 * TODO
+	 * Create the link to the discussion
+	 *
+	 */
+	private function jiveDiscussion() {
+	
+		if (($this->jiveAPIURI === NULL) || ($this->jiveUserPwd === NULL))
+			if ($this->initJiveServer() === NULL)
+				return 'Ping failed with error: '.$this->jiveErrMsg;
+	
+			if (($data = $this->getJiveData($this->jiveAPIURI.'/messages/64658')) === FALSE)
+				return $this->jiveErrMsg;
+	
+			return $data;
+	}
+	
+	
 	/**
 	 * Ping the Jive server.
 	 * 
@@ -96,7 +113,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 */
 	private function jivePing() {
 		
-		if (($data = $this->initJiveServer()) === NULL)
+		if (($data = $this->initJiveServer()) === FALSE)
 			return 'Ping failed with error: '.$this->jiveErrMsg; 
 				
 		$jiveInfo = json_decode($data, TRUE);
@@ -104,29 +121,12 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
 			return FALSE;
 		}
-		foreach ($jiveInfo['jiveCoreVersions'] as $elem)
-			if ($elem['version'] == 3)
-				$jiveAPIVersion = 'and API v3.'.$elem['revision'];
+		if (isset($jiveInfo['jiveCoreVersions']))
+			foreach ($jiveInfo['jiveCoreVersions'] as $elem)
+				if ($elem['version'] == 3)
+					$jiveAPIVersion = 'and API v3.'.$elem['revision'];
 		
 		return 'Ping OK on '.$this->jiveAPIURI.' with Jive server v'.$jiveInfo['jiveVersion'].$jiveAPIVersion;
-	}
-	
-	
-	/**
-	 * TODO
-	 * Create the link to the discussion  
-	 * 
-	 */
-	private function jiveDiscussion() {
-		
-		if (($this->jiveAPIURI === NULL) || ($this->jiveUserPwd === NULL))
-			if ($this->initJiveServer() === NULL)
-				return 'Ping failed with error: '.$this->jiveErrMsg;
-		
-		if (($data = $this->getJiveData($this->jiveAPIURI.'/messages/64658')) === FALSE)
-			return $this->jiveErrMsg;
-
-		return $data;
 	}
 	
 	
@@ -182,10 +182,17 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
 			return FALSE;
 		}
-		foreach ($jiveInfo['jiveCoreVersions'] as $elem)
-			if ($elem['version'] == 3 && $elem['uri'] != NULL)
-				// Append 'version.uri' to the API URI 
-				$this->jiveAPIURI = $jiveServerURL.$elem['uri'];
+		//if (array_key_exists('jiveCoreVersions',$jiveInfo))
+		if (isset($jiveInfo['jiveCoreVersions'])) {
+			foreach ($jiveInfo['jiveCoreVersions'] as $elem)
+				if ($elem['version'] == 3 && isset($elem['uri']))
+					// Append 'version.uri' to the API URI 
+					$this->jiveAPIURI = $jiveServerURL.$elem['uri'];
+		}
+		else {
+			$this->jiveErrMsg = 'Cannot find any Core API version for this Jive server';
+			return FALSE;
+		}
 		if ($this->jiveAPIURI === NULL) {
 			$this->jiveErrMsg = 'Cannot find Core API v3 URI for this Jive server';
 			return FALSE;
@@ -193,7 +200,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 					
 		return $data;
 	}
-	
+		
 	/**
 	 * Get data from the Jive server 
 	 * 
