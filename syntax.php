@@ -9,14 +9,19 @@
 if(!defined('DOKU_INC')) die();
 if(!defined('DOKU_PLUGIN')) define('DOKU_PLUGIN',DOKU_INC.'lib/plugins/');
 require_once(DOKU_PLUGIN.'syntax.php');
- 
+
+
 /**
  * All DokuWiki plugins to extend the parser/rendering mechanism
  * need to inherit from this class
 */
 class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 
-	 
+	
+	private $jiveErrMsg = NULL; 
+	private $jiveUserPwd = NULL;
+	private $jiveAPIURI = NULL;
+	private $jiveVersion = NULL;
 	 
 	/**
 	 * Get the type of syntax this plugin defines.
@@ -67,11 +72,13 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				if ($match = substr($match, 7, -2))
 					switch($match) {
 						case 'discussion' :
-							return $this->showJiveDiscussion();
+							return $this->jiveDiscussion();
 
 						case 'events' :
 							return 'Liste des événements';
-							
+						
+						case 'ping' :
+							return $this->jivePing();
 						default:
 							return 'Invalid expression';
 				}
@@ -81,53 +88,156 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	}
 	
 	
+
 	/**
-	 * Create the link to the discussion  
+	 * Ping the Jive server.
+	 * 
+	 * @return A string with the Jive server version and the API version 
 	 */
-	private function showJiveDiscussion() {
-		// get configuration variables to access Jive server
-		if (($serverURL = $this->getConf('jiveServerURL')) == NULL)
-			return 'Cannot find "jiveServerURL" in configuration';
-		if (! substr_compare($serverURL, '!!', 0, 2, TRUE))
-			return 'Seems that "jiveServerURL" is not set';
-		if (($user = $this->getConf('jiveServerUser')) == NULL)
-			return 'Cannot find "jiveServerUser" in configuration';
-		if (! substr_compare($user, '!!', 0, 2, TRUE))
-			return 'Seems that "jiveServerUser" is not set';
-		if (($pass = $this->getConf('jiveServerPassword')) == NULL)
-			return 'Cannot find "jiveServerPassword" in configuration';
-		if (! substr_compare($pass, '!!', 0, 2, TRUE))
-			return 'Seems that "jiveServerPassword" is not set';
+	private function jivePing() {
 		
+		if (($data = $this->initJiveServer()) === NULL)
+			return 'Ping failed with error: '.$this->jiveErrMsg; 
+				
+		$jiveInfo = json_decode($data, TRUE);
+		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
+			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
+			return FALSE;
+		}
+		foreach ($jiveInfo['jiveCoreVersions'] as $elem)
+			if ($elem['version'] == 3)
+				$jiveAPIVersion = 'and API v3.'.$elem['revision'];
+		
+		return 'Ping OK on '.$this->jiveAPIURI.' with Jive server v'.$jiveInfo['jiveVersion'].$jiveAPIVersion;
+	}
+	
+	
+	/**
+	 * TODO
+	 * Create the link to the discussion  
+	 * 
+	 */
+	private function jiveDiscussion() {
+		
+		if (($this->jiveAPIURI === NULL) || ($this->jiveUserPwd === NULL))
+			if ($this->initJiveServer() === NULL)
+				return 'Ping failed with error: '.$this->jiveErrMsg;
+		
+		if (($data = $this->getJiveData($this->jiveAPIURI.'/messages/64658')) === FALSE)
+			return $this->jiveErrMsg;
+
+		return $data;
+	}
+	
+	
+	/**
+	 * Initialize the Jive server variables from the plugin configuration and a call 
+	 * to the version API, so we check availability of API v3 which has been the target
+	 * version for this plugin.
+	 * 
+	 * @return An array with serverVersion and APIVersion on success, or FALSE on error
+	 *         a with message set in jiveErrMsg.
+	 */
+	private function initJiveServer() {
+		
+		// Get and check the server URL
+		if (($jiveServerURL = $this->getConf ( 'jiveServerURL' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerURL" in configuration';
+			return FALSE;
+		}
+		if (! substr_compare ( $jiveServerURL, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerURL" is not set';
+			return FALSE;
+		}
 		// check that the server url start with "http"
-		if (substr_compare($serverURL, 'http', 0, 4, TRUE))
-			return 'Invalid Jive Server URL (should start with http:// or https://)';
-			
+		if (substr_compare ( $jiveServerURL, 'http', 0, 4, TRUE )) {
+			$this->jiveErrMsg = 'Invalid Jive Server URL (should start with http:// or https://)';
+			return FALSE;
+		}		
+		
+		// Get and check the user and password
+		if (($user = $this->getConf ( 'jiveServerUser' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerUser" in configuration';
+			return FALSE;
+		}
+		if (! substr_compare ( $user, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerUser" is not set';
+			return FALSE;
+		}
+		if (($pass = $this->getConf ( 'jiveServerPassword' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerPassword" in configuration';
+			return FALSE;
+		}
+		if (! substr_compare ( $pass, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerPassword" is not set';
+			return FALSE;
+		}
+		$this->jiveUserPwd = $user . ":" . $pass;
+		
+		//Check availability of Core API v3 and set the API URI
+		if (($data = $this->getJiveData($jiveServerURL.'/api/version')) === FALSE)
+			return FALSE;
+		$jiveInfo = json_decode($data, TRUE);
+		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
+			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
+			return FALSE;
+		}
+		foreach ($jiveInfo['jiveCoreVersions'] as $elem)
+			if ($elem['version'] == 3 && $elem['uri'] != NULL)
+				// Append 'version.uri' to the API URI 
+				$this->jiveAPIURI = $jiveServerURL.$elem['uri'];
+		if ($this->jiveAPIURI === NULL) {
+			$this->jiveErrMsg = 'Cannot find Core API v3 URI for this Jive server';
+			return FALSE;
+		}
+					
+		return $data;
+	}
+	
+	/**
+	 * Get data from the Jive server 
+	 * 
+	 * @return JSON data on success or FALSE on error with a message set in jiveErrMsg.  
+	 */
+	private function getJiveData($svc) {
+					
 		$curl = curl_init();
+		if ($svc === NULL) {
+			$this->jiveErrMsg = 'Internal plugin error: no service URL';
+			return FALSE;
+		}
+		curl_setopt($curl, CURLOPT_URL, $svc);
 		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-		curl_setopt($curl, CURLOPT_USERPWD, $user.":".$pass);
+		if ($this->jiveUserPwd === NULL) {
+			$this->jiveErrMsg = 'Internal plugin error: jiveUserPwd unset';
+			return FALSE;
+		}
+		curl_setopt($curl, CURLOPT_USERPWD, $this->jiveUserPwd);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
-		//curl_setopt($curl, CURLOPT_PROXY, 'proxy.rd.francetelecom.fr');
-		//curl_setopt($curl, CURLOPT_PROXYPORT, 80);
-		
-		// build URL
-		$url = $serverURL.'/api/core/v3/messages/64658';
-		curl_setopt($curl, CURLOPT_URL, $url);
-		
+				
 		$result = curl_exec($curl);
 		
-		if ($result === FALSE)
-			$data = 'Error: '.curl_error($curl);
-		elseif ($result == '')
-			$data = 'Unknown error. Is the URL correct?';
-		else
-			$data = $result;
-		
+		// Check the result
+		if ($result === FALSE) {
+			$this->jiveErrMsg = 'Error: '.curl_error($curl);
+			curl_close($curl);
+			return FALSE;
+		}
+		if ($result == '') {
+			$this->jiveErrMsg = 'Unknown error. Is the URL correct?';
+			curl_close($curl);
+			return FALSE;
+		}
 		curl_close($curl);
+		
+		// Strip the JSON security string
+		// see https://developers.jivesoftware.com/api/v3/cloud/rest/index.html#security
+		$data = preg_replace('/^throw.*;\s*/', '', $result);
 		
 		return $data;
 	}
+
 
 	
 	
