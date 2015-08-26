@@ -89,22 +89,32 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	
 	
 	/**
-	 * TODO
-	 * Create the link to the discussion
+	 * Return the link to the Jive server discussion about the current wiki page
+	 * 
+	 *  @return A string with the HTML to render
 	 *
 	 */
 	private function jiveDiscussion() {
 	
 		if (($this->jiveAPIURI === NULL) || ($this->jiveUserPwd === NULL))
 			if ($this->initJiveServer() === NULL)
-				return 'Ping failed with error: '.$this->jiveErrMsg;
+				return 'Failed to contact the Jive Server: '.$this->jiveErrMsg;
 	
-			if (($data = $this->getJiveData($this->jiveAPIURI.'/messages/64658')) === FALSE)
-				return $this->jiveErrMsg;
-	
-			return $data;
+		global $ID;
+		$html = p_get_metadata($ID, 'relation plugin_jive_html');
+		if ($html === NULL) {
+  			$data = sprintf($this->getLang('createJiveDiscussion'), '/doku.php?id='.$ID.'&do=createJiveDiscussion');		
+		}
+		else {
+			// Get data about the discussion
+			$contentID = p_get_metadata($ID, 'relation plugin_jive_contentID', METADATA_DONT_RENDER);
+			//TODO
+			
+			$data = sprintf($this->getLang('linkToJiveDiscussion'), $html);
+		}
+		return $data;
 	}
-	
+
 	
 	/**
 	 * Ping the Jive server.
@@ -126,7 +136,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				if ($elem['version'] == 3)
 					$jiveAPIVersion = 'and API v3.'.$elem['revision'];
 		
-		return 'Ping OK on '.$this->jiveAPIURI.' with Jive server v'.$jiveInfo['jiveVersion'].$jiveAPIVersion;
+		return 'Ping OK on '.$this->jiveAPIURI.' running Jive server v'.$jiveInfo['jiveVersion'].$jiveAPIVersion;
 	}
 	
 	
@@ -141,34 +151,34 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	private function initJiveServer() {
 		
 		// Get and check the server URL
-		if (($jiveServerURL = $this->getConf ( 'jiveServerURL' )) === NULL) {
+		if (($jiveServerURL = $this->getConf( 'jiveServerURL' )) === NULL) {
 			$this->jiveErrMsg = 'Cannot find "jiveServerURL" in configuration';
 			return FALSE;
 		}
-		if (! substr_compare ( $jiveServerURL, '!!', 0, 2, TRUE )) {
+		if (! substr_compare( $jiveServerURL, '!!', 0, 2, TRUE )) {
 			$this->jiveErrMsg = 'Seems that "jiveServerURL" is not set';
 			return FALSE;
 		}
 		// check that the server url start with "http"
-		if (substr_compare ( $jiveServerURL, 'http', 0, 4, TRUE )) {
+		if (substr_compare( $jiveServerURL, 'http', 0, 4, TRUE )) {
 			$this->jiveErrMsg = 'Invalid Jive Server URL (should start with http:// or https://)';
 			return FALSE;
 		}		
 		
 		// Get and check the user and password
-		if (($user = $this->getConf ( 'jiveServerUser' )) === NULL) {
+		if (($user = $this->getConf( 'jiveServerUser' )) === NULL) {
 			$this->jiveErrMsg = 'Cannot find "jiveServerUser" in configuration';
 			return FALSE;
 		}
-		if (! substr_compare ( $user, '!!', 0, 2, TRUE )) {
+		if (! substr_compare( $user, '!!', 0, 2, TRUE )) {
 			$this->jiveErrMsg = 'Seems that "jiveServerUser" is not set';
 			return FALSE;
 		}
-		if (($pass = $this->getConf ( 'jiveServerPassword' )) === NULL) {
+		if (($pass = $this->getConf( 'jiveServerPassword' )) === NULL) {
 			$this->jiveErrMsg = 'Cannot find "jiveServerPassword" in configuration';
 			return FALSE;
 		}
-		if (! substr_compare ( $pass, '!!', 0, 2, TRUE )) {
+		if (! substr_compare( $pass, '!!', 0, 2, TRUE )) {
 			$this->jiveErrMsg = 'Seems that "jiveServerPassword" is not set';
 			return FALSE;
 		}
@@ -253,7 +263,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 */
 	function render($mode, &$renderer, $data) {
 		if($mode == 'xhtml'){
-			$renderer->doc .= '<p>'.$data.'</p>';
+			$renderer->doc .= '<h2>'.$this->getLang('discussionTitle').'</h2><p>'.$data.'</p>';
 			return true;
 		}
 		return false;
