@@ -63,6 +63,9 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 						case 'events' :
 							return 'Not implemented yet';
 						
+						case 'create' :			//FIXME delete before delivery
+							return $this->createJiveGroup();
+							
 						case 'ping' :
 							return $this->jivePing();
 						default:
@@ -71,6 +74,52 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				break;
 		}
 		return array();
+	}
+	
+	
+	/**
+	 * Create a new Jive group to hold discussions about wiki pages
+	 * 
+	 * FIXME Move the following function to action.php
+	 */
+	private function createJiveGroup() {
+	
+		if (($jive = $this->loadHelper('jive')) === NULL)
+			return 'Cannot load helper for jive plugin.';
+	
+		if ($jive->initJiveServer() === FALSE)
+			return 'Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg();
+		
+		if (($placeID = $jive->getJiveGroup(NULL)) !== NULL)
+		//	return "Jive group (placeID=".$placeID.") already exists - nothing to do."; //FIXME effacer et reprndre code ci-dessous à débuguer
+			if (($data = $jive->getJiveData('/places/'.$placeID)) !== FALSE) {
+				$info = json_decode($data, TRUE);
+				if (isset($info['placeID']) && strcmp($info['placeID'],$placeID) == 0)
+					return "Jive group (placeID=".$placeID.") already exists - nothing to do.";
+			}
+
+		global $conf;
+		if (($displayName = strtr(utf8_deaccent($conf['title'])," ", "-")) === NULL)
+			return 'error converting $conf[\'title\'].';
+		
+		// Create JSON data for group creation request
+		if (($json = json_encode(array(
+						"type" => "group",
+						"name" => $conf['title'],
+						"displayName" => $displayName,
+						"description" => sprintf($this->getLang('jiveGroupDescription'), $conf['title'])." - ".DOKU_URL,
+						"groupType" => "OPEN"))) === FALSE)
+			return 'error encoding group creation post to JSON';
+		
+		// Call API to create group
+		if (($resp = $jive->postJiveData('/places', $json)) === FALSE)
+			return 'Failed to create group: '.$jive->jiveLastErrorMsg();
+		
+		// Get the placeID for the group created
+		if (($placeID = $jive->getJiveGroup($resp)) === NULL)
+			return 'Failed to get group ID: '.$jive->jiveLastErrorMsg()."<br>JSON data: ".$resp;
+			
+		return "Jive group (placeID=".$placeID.") created on Jive server and stored in Wiki configuration.";
 	}
 	
 	
@@ -89,7 +138,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		}
 		else {
 			// Get information about the discussion
-			if (($jive = loadHelper('jive', TRUE)) === NULL)
+			if (($jive = $this->loadHelper('jive')) === NULL)
 				return 'Cannot load helper for jive plugin.';
 		
 			if ($jive->initJiveServer() === FALSE)
@@ -109,7 +158,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 */
 	private function jivePing() {
 		
-		if (($jive = $this->loadHelper('jive', TRUE)) === NULL)
+		if (($jive = $this->loadHelper('jive')) === NULL)
 			return 'Cannot load helper for jive plugin.';
 		
 		if (($data = $jive->initJiveServer()) === FALSE)
@@ -125,7 +174,8 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				if ($elem['version'] == 3)
 					$jiveAPIVersion = 'and API v3.'.$elem['revision'];
 		
-		return 'Ping OK on '.$jive->getJiveServerURL.' running Jive server v'.$jiveInfo['jiveVersion'].$jiveAPIVersion;
+		return 'Ping OK on '.$jive->getJiveServerURL().' running Jive server v'
+				.$jiveInfo['jiveVersion'].$jiveAPIVersion;
 	}
 		
 	

@@ -8,3 +8,4 @@
 $lang['discussionTitle']		= 'Jive discussion';
 $lang['createJiveDiscussion']	= 'No discussion yet. <a href=%s>Open it!</a>';
 $lang['linkToJiveDiscussion']	= '<a href=%s>Join the discussion!</a>';
+$lang['jiveGroupDescription']	= 'Discussions and more on %s';

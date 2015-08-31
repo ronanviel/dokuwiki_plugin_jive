@@ -173,7 +173,9 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 		if ($svc === NULL) {
 			$url = $this->jiveServerURL.'/api/version';
 		}
-		elseif ($this->jiveServerURL === NULL || $this->jiveAPI === NULL) {
+		elseif ($this->jiveServerURL === NULL ||
+				$this->jiveAPI === NULL ||
+				$this->jiveUserPwd === NULL) {
 			$this->jiveErrMsg = 'Internal plugin error: call initJiveServer() first!';
 			return FALSE;
 		}
@@ -183,20 +185,18 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 		
 		$curl = curl_init();
 		curl_setopt($curl, CURLOPT_URL, $url);
+		curl_setopt($curl, CURLOPT_HTTPGET, TRUE);
 		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-		if ($this->jiveUserPwd === NULL) {
-			$this->jiveErrMsg = 'Internal plugin error: call initJiveServer() first!';
-			return FALSE;
-		}
 		curl_setopt($curl, CURLOPT_USERPWD, $this->jiveUserPwd);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+		curl_setopt($curl, CURLOPT_TIMEOUT, 30);
 	
 		$result = curl_exec($curl);
 	
 		// Check the result
 		if ($result === FALSE) {
-			$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL '.$url.'.';
+			$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL ('.$url.')';
 			curl_close($curl);
 			return FALSE;
 		}
@@ -216,26 +216,128 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	
 	
 	/**
-	 * Get the Jive Group information stored in this DokuWiki installation
+	 * Post data on the Jive server
 	 *
-	 * @return A JSON encoded string containing 'placeID' and 'resources'.'html' or NULL on error
+	 * @param A string containing the API service to use - this must start with a '/', and
+	 * 			A string containing the JSON data to post.
+	 * @return JSON data on success or FALSE on error with a message set in jiveErrMsg.
 	 */
-	public function getJiveGroup() {
-		global $DOKU_PLUGIN;
-		if (file_exists($DOKU_PLUGIN.'jivegroup.json'))
-			if (($content = file_get_contents($DOKU_PLUGIN.'jivegroup.json')) !== FALSE)
-				return $content;
-			return NULL;
+	public function postJiveData($svc, $json) {
+			
+		// Build the full URL
+		if ($svc === NULL) {
+			$this->jiveErrMsg = 'Internal plugin error: missing service on postJiveData()';
+		}
+		elseif ($this->jiveServerURL === NULL ||
+				$this->jiveAPI === NULL ||
+				$this->jiveUserPwd === NULL) {
+			$this->jiveErrMsg = 'Internal plugin error: call initJiveServer() first!';
+			return FALSE;
+		}
+		else {
+			$url = $this->jiveServerURL.$this->jiveAPI.$svc;
+		}
+	
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_URL, $url);
+		curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
+		curl_setopt($curl, CURLOPT_HTTPHEADER, 
+					array('Content-type: application/json', 'Content-length: '.strlen($json)));
+		curl_setopt($curl, CURLOPT_POSTFIELDS, $json);
+		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+		curl_setopt($curl, CURLOPT_USERPWD, $this->jiveUserPwd);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
+		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+		curl_setopt($curl, CURLOPT_TIMEOUT, 20);
+	
+		$result = curl_exec($curl);
+	
+		// Check the result
+		if ($result === FALSE) {
+			$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL ('.$url.')';
+			curl_close($curl);
+			return FALSE;
+		}
+		if ($result == '') {
+			$this->jiveErrMsg = 'Unknown error. Is the URL correct?';
+			curl_close($curl);
+			return FALSE;
+		}
+		curl_close($curl);
+	
+		// Strip the JSON security string
+		// see https://developers.jivesoftware.com/api/v3/cloud/rest/index.html#security
+		$data = preg_replace('/^throw.*;\s*/', '', $result);
+	
+		return $data;
 	}
 	
 	
 	/**
-	 * Store the Jive Group information in this DokuWiki installation
+	 * Get the Jive Group 'placeID' for this DokuWiki installation
 	 *
-	 * @return TRUE on success or a string with an error message on failure
+	 * @param String with JSON formatted answer to the API call "create group"
+	 * @return A string with the 'placeID' or NULL on error with a message set in jiveErrMsg
 	 */
-	public function setJiveGroup() {
-		//TODO
-	
+	public function getJiveGroup($json) {
+		global $DOKU_PLUGIN;
+		if (!defined ('JIVEPLUGIN_PLACEID'))
+			define('JIVEPLUGIN_PLACEID','JIVEPLUGIN_PLACEID');
+		
+		if ($json === NULL)
+			if (file_exists($DOKU_PLUGIN.JIVEPLUGIN_PLACEID)) {
+				if (($content = file_get_contents($DOKU_PLUGIN.JIVEPLUGIN_PLACEID)) === FALSE) {
+					$this->jiveErrMsg = 'Cannot read JIVEPLUGIN_PLACEID file';
+					return NULL;
+				}
+				return $content;
+			}
+			else {
+				$this->jiveErrMsg = 'Cannot find JIVEPLUGIN_PLACEID file';
+				return NULL;
+			}
+		
+		// $json is not NULL, we must extract the placeID, store it to file and return it
+		$jiveInfo = json_decode($json, TRUE);
+		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
+			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
+			return NULL;
+		}
+		if (!isset($jiveInfo['placeID']))
+			// look for 'error', search for same name existing group and get its placeID
+			if (isset($jiveInfo['error'])) {
+				if (isset($jiveInfo['error']['status']) && $jiveInfo['error']['status'] == 409) {
+					if ($this->initJiveServer() === NULL)
+						return NULL;	
+					global $conf;
+					if ( ($data = $this->getJiveData('/places?filter=search('.$conf['title'].')')) === FALSE)
+						return NULL;
+					$info = json_decode($data, TRUE);
+					if (isset($info['list'][0]['placeID'])) {
+						$jiveInfo['placeID'] = $info['list'][0]['placeID'];
+					}
+					else {
+						$this->jiveErrMsg = 'Cannot find placeID for Jive group with same name';
+						return;
+					}
+				}
+				else {
+					$this->jiveErrMsg = 'Unknown error from Jive server';
+					return NULL;
+				}
+			}
+			else {
+				$this->jiveErrMsg = 'Cannot understand JSON data';
+				return NULL;
+			}
+		
+		$nb = file_put_contents(JIVEPLUGIN_PLACEID, $jiveInfo['placeID']);
+		if ($nb == 0 || $nb === FALSE) {
+			$this->jiveErrMsg = 'Error writing placeID to file';
+			return NULL;
+		}
+		return $jiveInfo['placeID'];
+		
 	}
+	
 }
