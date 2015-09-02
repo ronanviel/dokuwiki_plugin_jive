@@ -37,7 +37,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 * Connect lookup pattern to lexer.
 	 */
 	function connectTo($mode) {
-		$this->Lexer->addSpecialPattern('\{\{jive>[^}]*\}\}',$mode,'plugin_jive');
+		$this->Lexer->addSpecialPattern('\{\{jive>[^}]*?\}\}',$mode,'plugin_jive');
 	}
 	 
 	   
@@ -45,42 +45,131 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 * Handler to prepare matched data for the rendering process.
 	 */
 	function handle($match, $state, $pos, &$handler){
-		switch ($state) {
-			case DOKU_LEXER_ENTER :
-				break;
-			case DOKU_LEXER_MATCHED :
-				break;
-			case DOKU_LEXER_UNMATCHED :
-				break;
-			case DOKU_LEXER_EXIT :
-				break;
-			case DOKU_LEXER_SPECIAL :
-				if ($match = substr($match, 7, -2))
-					switch($match) {
-						case 'discussion' :
-							return $this->jiveDiscussion();
-
-						case 'events' :
-							return 'Not implemented yet';
-						
-						case 'create' :			//FIXME delete before delivery
-							return $this->createJiveGroup();
-							
-						case 'ping' :
-							return $this->jivePing();
-						default:
-							return 'Invalid expression';
-				}
-				break;
+		
+		$match = substr($match, 7, -2); //Strip '{{jive>' and '}}'
+		if (($pos = strpos($match, '?')) === FALSE) {
+			$cmd = $match;
+			$arg = NULL;
+		} 
+		else {
+			$cmd = substr($match, 0, $pos-strlen($match));
+			$arg = substr($match, $pos+1);
 		}
-		return array();
+			
+		switch ($cmd) {
+			case 'discussion' :
+				return $this->jiveDiscussion();
+
+			case 'events' :
+				return 'Not implemented yet';
+						
+			case 'create' :
+				return $this->createJiveGroup();
+			case 'init' :
+				return $this->initJive($arg);
+							
+			case 'ping' :
+				return $this->jivePing();
+							
+			case 'cdis' :	//FIXME remove before delivery
+				return $this->createJiveDiscussion();
+							
+			default:
+				return 'Invalid command for Jive plugin: '.$cmd;
+		}
+		
 	}
+	
+	
+	/**
+	 * Create a new Jive discussion for the current wiki page
+	 */
+	private function createJiveDiscussion() {
+	
+		global $ID;
+		global $conf;
+	
+		if (($jive = $this->loadHelper('jive')) === NULL)
+			return 'Cannot load helper for jive plugin.';
+		
+		if ($jive->initJiveServer() === FALSE)
+			return 'Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg();
+		
+		if (($placeID = $jive->getJiveGroup(NULL)) === NULL)
+			return 'Failed to get Jive group: '.$jive->jiveLastErrorMsg();
+		
+		// Get the title of the current page
+		if (($title = p_get_metadata(cleanID($ID), 'title')) === NULL)
+			return 'Failed to get page title from metadata <h2>';
+		
+		// create the JSON request data
+		if (($json = json_encode(array(
+				"content" => array(
+						"type" => "text/html",
+						"text" => sprintf($this->getLang('jiveDiscussionContent'), 
+											DOKU_URL.$ID, $title)),
+				"subject" => sprintf($this->getLang('jiveDiscussionSubject'), $title),
+				"type" => "discussion",
+				"tags" => array($conf['title'])
+				))) === FALSE)
+				return 'Error encoding discussion creation post to JSON';
+				
+		if (($data = $jive->postJiveData('/places/'.$placeID.'/contents',$json)) === FALSE)
+			return 'Failed to create discussion for that page: '.$jive->jiveLastErrorMsg();
+			
+		// Get and store useful URLs in metadata of the page
+		$info = json_decode($data, TRUE);
+		if ($info === NULL && json_last_error() !== JSON_ERROR_NONE)
+			return 'Failed to decode JSON returned on create Discussion. JSON error: '.json_last_error_msg();
+		
+		if (isset($info['error']))
+			return 'Failed to create Discussion. JSON data returned: '.$info;
+
+		if (!isset($info['contentID']))
+			return 'Failed to get contentID for Discussion created. JSON data returned: '.$info;
+		
+		$met = array('relation' => array('jivePlugin_contentID' => $info['contentID'],
+											'jivePlugin_html' => $info['resources']['html']['ref']));
+		if (p_set_metadata(cleanID($ID), $met) === FALSE)
+			return 'Failed to store metadata. Warning: multiple discussions on the same page maybe created.';
+			
+		return "C'est bon !"; //FIXME
+	}
+	
+	
+	/**
+	 * Initialize Jive entities or files on Jive server and/or DokuWiki server
+	 */
+	private function initJive($arg) {
+		if ($arg === null || $arg == '')
+			return 'Missing argument "group" or "discussion" for init command.';
+		
+		switch ($arg) {
+			case 'discussion' :
+				return $this->resetJiveDiscussion();
+			case 'group' :
+				return $this->createJiveGroup();
+			default:
+				return 'Unknown argument "'.$arg.'" for init command. Must be "group" or "discussion"';
+		}
+		
+	}
+	
+	
+	/**
+	 *  Reset the discussion metadata to NULL
+	 */
+	 private function resetJiveDiscussion() {
+	 	
+	 	// TODO
+	 	
+	 	return 'Discussion resetted for this page';
+	 }
 	
 	
 	/**
 	 * Create a new Jive group to hold discussions about wiki pages
 	 * 
-	 * FIXME Move the following function to action.php
 	 */
 	private function createJiveGroup() {
 	
@@ -91,7 +180,6 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			return 'Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg();
 		
 		if (($placeID = $jive->getJiveGroup(NULL)) !== NULL)
-		//	return "Jive group (placeID=".$placeID.") already exists - nothing to do."; //FIXME effacer et reprndre code ci-dessous à débuguer
 			if (($data = $jive->getJiveData('/places/'.$placeID)) !== FALSE) {
 				$info = json_decode($data, TRUE);
 				if (isset($info['placeID']) && strcmp($info['placeID'],$placeID) == 0)
@@ -132,7 +220,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	private function jiveDiscussion() {
 	
 		global $ID;
-		$html = p_get_metadata($ID, 'relation plugin_jive_html');
+		$html = p_get_metadata(cleanID($ID), 'relation jivePlugin_html');
 		if ($html === NULL) {
   			$data = sprintf($this->getLang('createJiveDiscussion'), '/doku.php?id='.$ID.'&do=jiveCreateDiscussion');		
 		}

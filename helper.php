@@ -12,7 +12,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 		$result = array();
 		$result[] = array(
 				'name' => 'initJiveServer',
-				'desc' => 'returns an array with serverVersion and APIVersion on success, or FALSE on error
+				'desc' => 'returns JSON answer to API check call, or FALSE on error
 							a with message set in jiveErrMsg.',
 				'params' => NULL,
 				'return' => array('result' => 'array')
@@ -57,8 +57,8 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	 * to the version API, so we check availability of API v3 which has been the target
 	 * version for this plugin.
 	 *
-	 * @return An array with serverVersion and APIVersion on success, or FALSE on error
-	 *         a with message set in jiveErrMsg.
+	 * @return JSON-formatted string with all the information about the Jive API on the
+	 * 			the server, or FALSE on error a with message set in jiveErrMsg.
 	 */
 	public function initJiveServer() {
 	
@@ -297,7 +297,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				return NULL;
 			}
 		
-		// $json is not NULL, we must extract the placeID, store it to file and return it
+		// $json is not NULL, so we must extract the placeID, store it to file and return it
 		$jiveInfo = json_decode($json, TRUE);
 		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
 			$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
@@ -307,6 +307,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			// look for 'error', search for same name existing group and get its placeID
 			if (isset($jiveInfo['error'])) {
 				if (isset($jiveInfo['error']['status']) && $jiveInfo['error']['status'] == 409) {
+					// error status = 409 indicates that group name already exists
 					if ($this->initJiveServer() === NULL)
 						return NULL;	
 					global $conf;
