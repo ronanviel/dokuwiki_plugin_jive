@@ -1,0 +1,13 @@
+@CHARSET "utf-8";
+
+#jive_plugin {
+	background-color: rgb(238,238,238);
+	color: #000000;
+}
+
+#jive_plugin .title {
+	font-family: AvenirNextLTW01-Regular,"Helvetica Neue",Helvetica,Arial,"Lucida Grande",sans-serif;
+	font-size: 28px;
+	color: rgb(0, 136, 225);
+	font-weight: normal;
+}

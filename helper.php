@@ -280,20 +280,21 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	 * @return A string with the 'placeID' or NULL on error with a message set in jiveErrMsg
 	 */
 	public function getJiveGroup($json) {
-		global $DOKU_PLUGIN;
-		if (!defined ('JIVEPLUGIN_PLACEID'))
-			define('JIVEPLUGIN_PLACEID','JIVEPLUGIN_PLACEID');
+				
+		$pluginInfo = $this->getInfo();
+		if (!defined ('JIVEPLUGIN_DATA') && $pluginInfo['date'] != '0000-00-00') //see /inc/plugin.php @ line 44
+			define('JIVEPLUGIN_DATA',DOKU_PLUGIN.$pluginInfo['base'].'/placeID');
 		
 		if ($json === NULL)
-			if (file_exists($DOKU_PLUGIN.JIVEPLUGIN_PLACEID)) {
-				if (($content = file_get_contents($DOKU_PLUGIN.JIVEPLUGIN_PLACEID)) === FALSE) {
-					$this->jiveErrMsg = 'Cannot read JIVEPLUGIN_PLACEID file';
+			if (file_exists(JIVEPLUGIN_DATA)) {
+				if (($content = file_get_contents(JIVEPLUGIN_DATA)) === FALSE) {
+					$this->jiveErrMsg = 'Cannot read file "'.JIVEPLUGIN_DATA.'"';
 					return NULL;
 				}
 				return $content;
 			}
 			else {
-				$this->jiveErrMsg = 'Cannot find JIVEPLUGIN_PLACEID file';
+				$this->jiveErrMsg = 'Cannot find file "'.JIVEPLUGIN_DATA.'"';
 				return NULL;
 			}
 		
@@ -332,9 +333,9 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				return NULL;
 			}
 		
-		$nb = file_put_contents(JIVEPLUGIN_PLACEID, $jiveInfo['placeID']);
+		$nb = file_put_contents(JIVEPLUGIN_DATA, $jiveInfo['placeID']);
 		if ($nb == 0 || $nb === FALSE) {
-			$this->jiveErrMsg = 'Error writing placeID to file';
+			$this->jiveErrMsg = 'Error writing placeID to file "'.JIVEPLUGIN_DATA.'"';
 			return NULL;
 		}
 		return $jiveInfo['placeID'];
