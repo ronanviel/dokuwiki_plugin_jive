@@ -19,7 +19,9 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 		if ($key = substr($event->data, 5, 32))
 			switch($key) {
 				case 'create_discussion' :
-					$this->createJiveDiscussion();
+					$event->preventDefault();
+					if (($location = $this->createJiveDiscussion()) !== NULL)
+						header("Location: ".$location);
 					break;
 				default:
 					break;	// Unknown keyword - do nothing
@@ -30,6 +32,8 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 	
 	/**
  	 * Create a new Jive discussion for the current wiki page
+ 	 * 
+ 	 * @return string URL to the discussion on the Jive server or NULL
  	 */
 	public function createJiveDiscussion() {
 		
@@ -38,24 +42,24 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 		
 		if (($jive = $this->loadHelper('jive')) === NULL) {
 			msg('Cannot load helper for jive plugin.', -1);
-			return '';
+			return NULL;
 		}
 		
 		if ($jive->initJiveServer() === FALSE) {
 			msg('Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg(), -1);
-			return '';
+			return NULL;
 		}
 		
 		if (($placeID = $jive->getJiveGroup(NULL)) === NULL) {
 			msg('Failed to get Jive group: '.$jive->jiveLastErrorMsg(), -1);
-			return '';
+			return NULL;
 		}
 		
 		// Get the title of the current page
 		$title = p_get_metadata(cleanID($ID), 'title', METADATA_DONT_RENDER);
 		if ( $title === NULL || $title == '') {
 			msg('Failed to get page title from metadata', -1);
-			return '';
+			return NULL;
 		}
 		
 		// create the JSON request data
@@ -69,29 +73,29 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 				"tags" => array($conf['title']))
 			)) === FALSE) {
 			msg('Error encoding discussion creation post to JSON', -1);
-			return'';
+			return NULL;
 		}
 		
 		if (($data = $jive->postJiveData('/places/'.$placeID.'/contents',$json)) === FALSE) {
 			msg('Failed to create discussion for that page: '.$jive->jiveLastErrorMsg(), -1);
-			return '';
+			return NULL;
 		}
 			
 		// Get and store useful URLs in metadata of the page
 		$info = json_decode($data, TRUE);
 		if ($info === NULL && json_last_error() !== JSON_ERROR_NONE) {
 			msg('Failed to decode JSON returned on create Discussion. JSON error: '.json_last_error_msg(), -1);
-			return '';
+			return NULL;
 		}
 		
 		if (isset($info['error'])) {
-			msg('Failed to create Discussion.', -1);
-			return 'JSON data returned:<br>'.$info;
+			msg('Failed to create Discussion. JSON data returned:<br>'.$info, -1);
+			return NULL;
 		}
 		
 		if (!isset($info['contentID'])) {
-			msg('Failed to get contentID for Discussion created.', -1);
-			return 'JSON data returned:<br>'.$info;
+			msg('Failed to get contentID for Discussion created. JSON data returned:<br>'.$info, -1);
+			return NULL;
 		}
 		
 		$meta = array('relation' => 
@@ -100,10 +104,10 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 									'discussion_html' => $info['resources']['html']['ref'])));
 		if (p_set_metadata(cleanID($ID), $meta) === FALSE) {
 			msg('Failed to store metadata. Warning: multiple discussions on the same page maybe created.', -1);
-			return '';
+			return NULL;
 		}
 			
-		msg('Jive discussion created');
+		return $info['resources']['html']['ref'];
 		
 	}
 	

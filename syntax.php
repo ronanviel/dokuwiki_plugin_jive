@@ -182,14 +182,21 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 */
 	private function jiveDiscussion() {
 	
+		global $conf;
+		$extern = '';
+		if (isset($conf['target']['extern']))
+			$extern = $conf['target']['extern'];
+		
 		global $ID;
 		$meta = p_get_metadata(cleanID($ID), 'relation jive_plugin');
 				
 		if ($meta === NULL || !isset($meta['discussion_html']) || ($html = $meta['discussion_html']) == '') {
-  			$data = sprintf($this->getLang('createJiveDiscussion'), '/doku.php?id='.$ID.'&do=jive_create_discussion');		
+  			$data = sprintf($this->getLang('createJiveDiscussion'), 
+  							'/doku.php?id='.$ID.'&do=jive_create_discussion',
+  							$extern);		
 		}
 		else {
-			// Get information about the discussion
+			// Show the link to the discussion
 			if (($jive = $this->loadHelper('jive')) === NULL) {
 				msg('Cannot load helper for jive plugin.', -1);
 				return array(FALSE, NULL);
@@ -200,9 +207,48 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				return array(FALSE, NULL);
 			}
 			
-			//TODO Get information on the discussion (# of msg, last msg date & creator, print last msg)
+			if (!isset($meta['discussion_contentID']) || ($contentID = $meta['discussion_contentID']) == '') {
+				msg('Failed to get the contentID for discussion. Please reset it with the syntax "{{jive>init?discussion}}"', -1);
+				return array(FALSE, NULL);
+			}
 			
-			$data = sprintf($this->getLang('linkToJiveDiscussion'), $html);
+			$data = '<div class="discussion__stats">';
+			if (($resp = $jive->getJiveData('/contents/'.$contentID)) !== FALSE) {
+				$info = json_decode($resp, TRUE);
+				
+				// Show information about the discussion
+				if (isset($info['followerCount']))
+					$data .= $this->getLang('JiveDiscussionFollower').$info['followerCount'].', ';	
+				if (isset($info['likeCount']))
+					$data .= $this->getLang('JiveDiscussionLike').$info['likeCount'].', ';
+				if (isset($info['replyCount'])) {
+					$data .= $this->getLang('JiveDiscussionReply').$info['replyCount'];
+					
+					if ($info['replyCount'] > 0) {
+						$data .='</div><div class="discussion__lastmsg">'.$this->getLang('jiveDiscussionLastMsg');
+						
+						$flags = '?startIndex='.($info['replyCount']-1).'&count=1';
+						$flags .= '&hierarchical=false'; //FIXME Check that API version is 3.1 or higher
+						
+						if (($resp = $jive->getJiveData('/messages/contents/'.$contentID.$flags)) !== FALSE) {
+							// Print the last message
+							$info = json_decode($resp, TRUE);
+							if (isset($info['list'][0]['author']['displayName']))
+								$data .= $this->getLang('jiveDiscussionLastMsg2')
+										.$info['list'][0]['author']['displayName'];
+							if (isset($info['list'][0]['updated'])) {
+								setlocale(LC_TIME, $conf['lang']);
+								$time = strtotime($info['list'][0]['updated']);
+								$data .= $this->getLang('jiveDiscussionLastMsg3').strftime('%c', $time);
+							}
+							if (isset($info['list'][0]['content']['text']))
+								$data .= '<div class="discussion__msg">'.$info['list'][0]['content']['text'].'</div>';
+						}
+					}
+				}
+			}
+			
+			$data .= '</div><p><b>'.sprintf($this->getLang('linkToJiveDiscussion'), $html, $extern).'</b></p>';
 		}
 		return array(FALSE, $data);
 	}
@@ -250,10 +296,10 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	function render($mode, &$renderer, $data) {
 		if ($mode == 'xhtml') {
 			if ($data[1] !== NULL) {
-				$renderer->doc .= '<div id="jive_plugin">';
+				$renderer->doc .= '<div class="jiveplugin__section">';
 				$renderer->doc .= '<div class="title">'.$this->getLang('discussionTitle').'</div>';
-				$renderer->doc .= '<p>'.$data[1].'</p>';
-				$renderer->doc .= '</div>';
+				$renderer->doc .= $data[1];
+				$renderer->doc .= '</div>';		// jiveplugin_section
 			}
 			return TRUE;
 		}

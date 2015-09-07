@@ -1,13 +1,45 @@
-@CHARSET "utf-8";
+/**
+ * style.css for Jive plugin
+ *
+ * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
+ * @author     Ronan Viel <ronan.viel@orange.com>
+ */
+ 
 
-#jive_plugin {
+.dokuwiki div.jiveplugin__section {
 	background-color: rgb(238,238,238);
 	color: #000000;
+	padding-top: 0.3em;
+	padding-bottom: 0.3em;
+	padding-left: 0.5em;
+	padding-right: 0.5em;
 }
 
-#jive_plugin .title {
-	font-family: AvenirNextLTW01-Regular,"Helvetica Neue",Helvetica,Arial,"Lucida Grande",sans-serif;
-	font-size: 28px;
+.dokuwiki div.jiveplugin__section div.title {
+	font-family: AvenirNextLTW01-Regular,Avenir-Regular,Helvetica,Arial,sans-serif;
+	font-size: 24px;
 	color: rgb(0, 136, 225);
 	font-weight: normal;
+	padding-bottom: 5px;
 }
+
+.dokuwiki div.jiveplugin__section div.discussion__stats {
+	font-size: 0.8em;
+	font-weight: bold;
+}
+
+.dokuwiki div.jiveplugin__section div.discussion__msg {
+	border: 0px none;
+	background: none repeat scroll 0% 0% rgb(255, 255, 255);
+	box-shadow: 1px 1px 2px 2px rgba(0, 0, 0, 0.1);
+	border-radius: 0px 0px 0px 0px;
+	margin-left: 3px;
+	margin-right: 3px;
+	margin-top: 3px;
+	margin-bottom: 3px;
+	padding-left: 16px;
+	padding-right: 16px;
+	padding-top: 8px;
+	padding-bottom: 4px;
+}
+	
