@@ -6,6 +6,10 @@
 * @author     Ronan Viel <ronan.viel@orange.com>
 */
  
+// must be run from within DokuWiki
+if (!defined('DOKU_INC')) die();
+
+
 class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	 
 	
@@ -47,11 +51,10 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	function handle($match, $state, $pos, &$handler){
 		
 		$match = substr($match, 7, -2); //Strip '{{jive>' and '}}'
-		if (($pos = strpos($match, '?')) === FALSE) {
+		if (($pos = strpos($match, '&')) === FALSE) {
 			$cmd = $match;
 			$arg = NULL;
-		} 
-		else {
+		} else {
 			$cmd = substr($match, 0, $pos-strlen($match));
 			$arg = substr($match, $pos+1);
 		}
@@ -126,7 +129,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		}
 	
 		if ($jive->initJiveServer() === FALSE) {
-			msg('Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg(), -1);
+			msg('Failed to contact the Jive server: '.$jive->jiveLastErrorMsg(), -1);
 			return array(FALSE, NULL);
 		}
 		
@@ -194,8 +197,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
   			$data = sprintf($this->getLang('createJiveDiscussion'), 
   							'/doku.php?id='.$ID.'&do=jive_create_discussion',
   							$extern);		
-		}
-		else {
+		} else {
 			// Show the link to the discussion
 			if (($jive = $this->loadHelper('jive')) === NULL) {
 				msg('Cannot load helper for jive plugin.', -1);
@@ -203,7 +205,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			}
 		
 			if ($jive->initJiveServer() === FALSE) {
-				msg('Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg(), -1);
+				msg('Failed to contact the Jive server: '.$jive->jiveLastErrorMsg(), -1);
 				return array(FALSE, NULL);
 			}
 			
@@ -317,5 +319,4 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 	
 }
 
-?>
 

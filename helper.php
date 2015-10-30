@@ -62,47 +62,45 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	 */
 	public function initJiveServer() {
 	
-	//	if (($this->jiveServerURL === NULL) || ($this->jiveUserPwd === NULL)) {
-			// Get and check the server URL
-			if (($this->jiveServerURL = $this->getConf( 'jiveServerURL' )) === NULL) {
-				$this->jiveErrMsg = 'Cannot find "jiveServerURL" in configuration';
-				return FALSE;
-			}
-			if (! substr_compare( $this->jiveServerURL, '!!', 0, 2, TRUE )) {
-				$this->jiveErrMsg = 'Seems that "jiveServerURL" is not set';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
-			// check that the server url start with "http"
-			if (substr_compare( $this->jiveServerURL, 'http', 0, 4, TRUE )) {
-				$this->jiveErrMsg = 'Invalid Jive Server URL (should start with http:// or https://)';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
+		// Get and check the server URL
+		if (($this->jiveServerURL = $this->getConf( 'jiveServerURL' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerURL" in configuration';
+			return FALSE;
+		}
+		if (! substr_compare( $this->jiveServerURL, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerURL" is not set';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
+		// check that the server url start with "http"
+		if (substr_compare( $this->jiveServerURL, 'http', 0, 4, TRUE )) {
+			$this->jiveErrMsg = 'Invalid Jive server URL (should start with http:// or https://)';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
 	
-			// Get and check the user and password
-			if (($user = $this->getConf( 'jiveServerUser' )) === NULL) {
-				$this->jiveErrMsg = 'Cannot find "jiveServerUser" in configuration';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
-			if (! substr_compare( $user, '!!', 0, 2, TRUE )) {
-				$this->jiveErrMsg = 'Seems that "jiveServerUser" is not set';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
-			if (($pass = $this->getConf( 'jiveServerPassword' )) === NULL) {
-				$this->jiveErrMsg = 'Cannot find "jiveServerPassword" in configuration';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
-			if (! substr_compare( $pass, '!!', 0, 2, TRUE )) {
-				$this->jiveErrMsg = 'Seems that "jiveServerPassword" is not set';
-				$this->jiveServerURL = NULL;
-				return FALSE;
-			}
-			$this->jiveUserPwd = $user . ":" . $pass;
-	//	}
+		// Get and check the user and password
+		if (($user = $this->getConf( 'jiveServerUser' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerUser" in configuration';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
+		if (! substr_compare( $user, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerUser" is not set';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
+		if (($pass = $this->getConf( 'jiveServerPassword' )) === NULL) {
+			$this->jiveErrMsg = 'Cannot find "jiveServerPassword" in configuration';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
+		if (! substr_compare( $pass, '!!', 0, 2, TRUE )) {
+			$this->jiveErrMsg = 'Seems that "jiveServerPassword" is not set';
+			$this->jiveServerURL = NULL;
+			return FALSE;
+		}
+		$this->jiveUserPwd = $user . ":" . $pass;
 		
 		//Check availability of Core API v3 and set the API URI
 		if (($data = $this->getJiveData(NULL)) === FALSE) {
@@ -110,33 +108,32 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			$this->jiveUserPwd = NULL;
 			return FALSE;
 		}
-	//	if ($this->jiveAPI === NULL) {
-			$jiveInfo = json_decode($data, TRUE);
-			if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
-				$this->jiveErrMsg = 'JSON error: '.json_last_error_msg();
-				$this->jiveServerURL = NULL;
-				$this->jiveUserPwd = NULL;
-				return FALSE;
-			}
-			if (isset($jiveInfo['jiveCoreVersions'])) {
-				foreach ($jiveInfo['jiveCoreVersions'] as $elem)
-					if ($elem['version'] == 3 && isset($elem['uri']))
-						// Append 'version.uri' to the API URI
-						$this->jiveAPI = $elem['uri'];
-			}
-			else {
-				$this->jiveErrMsg = 'Cannot find any Core API version for this Jive server';
-				$this->jiveServerURL = NULL;
-				$this->jiveUserPwd = NULL;
-				return FALSE;
-			}
-			if ($this->jiveAPI === NULL) {
-				$this->jiveErrMsg = 'Cannot find Core API v3 URI for this Jive server';
-				$this->jiveServerURL = NULL;
-				$this->jiveUserPwd = NULL;
-				return FALSE;
-			}
-	//	}
+
+		$jiveInfo = json_decode($data, TRUE);
+		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
+			$this->jiveErrMsg = '<br>JSON error: '.json_last_error_msg().'<br>Data received:<br><samp>'
+								.htmlentities($data, ENT_QUOTES).'</samp>';
+			$this->jiveServerURL = NULL;
+			$this->jiveUserPwd = NULL;
+			return FALSE;
+		}
+		if (isset($jiveInfo['jiveCoreVersions'])) {
+			foreach ($jiveInfo['jiveCoreVersions'] as $elem)
+				if ($elem['version'] == 3 && isset($elem['uri']))
+					// Append 'version.uri' to the API URI
+					$this->jiveAPI = $elem['uri'];
+		} else {
+			$this->jiveErrMsg = 'Cannot find any Core API version for this Jive server';
+			$this->jiveServerURL = NULL;
+			$this->jiveUserPwd = NULL;
+			return FALSE;
+		}
+		if ($this->jiveAPI === NULL) {
+			$this->jiveErrMsg = 'Cannot find Core API v3 URI for this Jive server';
+			$this->jiveServerURL = NULL;
+			$this->jiveUserPwd = NULL;
+			return FALSE;
+		}
 			
 		return $data;
 	}
@@ -172,31 +169,61 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			
 		if ($svc === NULL) {
 			$url = $this->jiveServerURL.'/api/version';
-		}
-		elseif ($this->jiveServerURL === NULL ||
+		} elseif ($this->jiveServerURL === NULL ||
 				$this->jiveAPI === NULL ||
 				$this->jiveUserPwd === NULL) {
 			$this->jiveErrMsg = 'Internal plugin error: call initJiveServer() first!';
 			return FALSE;
-		}
-		else {
+		} else {
 			$url = $this->jiveServerURL.$this->jiveAPI.$svc;
 		}
 		
 		$curl = curl_init();
-		curl_setopt($curl, CURLOPT_URL, $url);
-		curl_setopt($curl, CURLOPT_HTTPGET, TRUE);
-		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-		curl_setopt($curl, CURLOPT_USERPWD, $this->jiveUserPwd);
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
-		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
-		curl_setopt($curl, CURLOPT_TIMEOUT, 30);
-	
+		curl_reset($curl);
+		
+		$options = array(CURLOPT_HTTPGET => TRUE,
+						CURLOPT_FOLLOWLOCATION => TRUE,
+						CURLOPT_MAXREDIRS => 3,
+						CURLOPT_CONNECTTIMEOUT => 30,
+						CURLOPT_RETURNTRANSFER => TRUE,
+						CURLOPT_SSL_VERIFYPEER => FALSE,
+						//CURLOPT_HEADER => TRUE,
+						CURLOPT_URL => $url);
+		
+		// Options and parameters for basic authentication
+		$options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC; //FIXME OAuth
+		$options[CURLOPT_USERPWD] = $this->jiveUserPwd; 
+			
+		global $conf;
+		// Options and parameters for proxy tunnelling
+		if (isset($conf['proxy']['host']) && ($conf['proxy']['host'] != '') ) {
+			$options[CURLOPT_PROXY] = $conf['proxy']['host'];
+			$option[CURLOPT_HTTPPROXYTUNNEL] = TRUE;
+			if (isset($conf['proxy']['port']) && ($conf['proxy']['port'] != '') )
+				$options[CURLOPT_PROXYPORT] = $conf['proxy']['port'];
+			if (isset($conf['proxy']['user']) && ($conf['proxy']['user'] != '') ) {
+				$options[CURLOPT_PROXYUSERPWD] = $conf['proxy']['user'].':'.$conf['proxy']['pass'];
+				$options[CURLOPT_PROXYAUTH] = CURLAUTH_BASIC;
+			}
+			if (isset($conf['proxy']['ssl']) && ($conf['proxy']['ssl'] == 1) ) {
+				$this->jiveErrMsg = 'getJiveData() does not support SSL proxy';
+				curl_close($curl);
+				return FALSE;
+			}
+		}
+		
+		if (curl_setopt_array($curl, $options) === FALSE) {
+			$this->jiveErrMsg = 'Cannot set option(s) for cURL - cURL error: "'.curl_error($curl).'"';
+			curl_close($curl);
+			return FALSE;
+		}
 		$result = curl_exec($curl);
 	
 		// Check the result
 		if ($result === FALSE) {
-			$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL ('.$url.')';
+			$this->jiveErrMsg = 'cURL error "'.curl_error($curl).'" for URL '.$url;
+			if (isset($options[CURLOPT_PROXY]))
+				$this->jiveErrMsg .= ' with proxy '.$options[CURLOPT_PROXY].':'.$options[CURLOPT_PROXYPORT];
 			curl_close($curl);
 			return FALSE;
 		}
@@ -227,14 +254,12 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 		// Build the full URL
 		if ($svc === NULL) {
 			$this->jiveErrMsg = 'Internal plugin error: missing service on postJiveData()';
-		}
-		elseif ($this->jiveServerURL === NULL ||
+		} elseif ($this->jiveServerURL === NULL ||
 				$this->jiveAPI === NULL ||
 				$this->jiveUserPwd === NULL) {
 			$this->jiveErrMsg = 'Internal plugin error: call initJiveServer() first!';
 			return FALSE;
-		}
-		else {
+		} else {
 			$url = $this->jiveServerURL.$this->jiveAPI.$svc;
 		}
 	
@@ -292,8 +317,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 					return NULL;
 				}
 				return $content;
-			}
-			else {
+			} else {
 				$this->jiveErrMsg = 'Cannot find file "'.JIVEPLUGIN_DATA.'"';
 				return NULL;
 			}
@@ -317,18 +341,15 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 					$info = json_decode($data, TRUE);
 					if (isset($info['list'][0]['placeID'])) {
 						$jiveInfo['placeID'] = $info['list'][0]['placeID'];
-					}
-					else {
+					} else {
 						$this->jiveErrMsg = 'Cannot find placeID for Jive group with same name';
 						return;
 					}
-				}
-				else {
+				} else {
 					$this->jiveErrMsg = 'Unknown error from Jive server';
 					return NULL;
 				}
-			}
-			else {
+			} else {
 				$this->jiveErrMsg = 'Cannot understand JSON data';
 				return NULL;
 			}

@@ -46,7 +46,7 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 		}
 		
 		if ($jive->initJiveServer() === FALSE) {
-			msg('Failed to contact the Jive Server: '.$jive->jiveLastErrorMsg(), -1);
+			msg('Failed to contact the Jive server: '.$jive->jiveLastErrorMsg(), -1);
 			return NULL;
 		}
 		
