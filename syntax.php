@@ -195,7 +195,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 				
 		if ($meta === NULL || !isset($meta['discussion_html']) || ($html = $meta['discussion_html']) == '') {
   			$data = sprintf($this->getLang('createJiveDiscussion'), 
-  							'/doku.php?id='.$ID.'&do=jive_create_discussion',
+  							DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
   							$extern);		
 		} else {
 			// Show the link to the discussion

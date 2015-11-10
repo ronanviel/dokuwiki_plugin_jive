@@ -1,7 +1,7 @@
 base   jive
 author Ronan Viel
 email  ronan.viel@orange.com
-date   2015-09-07
+date   2015-11-09
 name   Jive Plugin
 desc   Allows interaction with a Jive-n social intranet server
 url    https://www.dokuwiki.org/plugin:jive

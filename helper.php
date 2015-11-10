@@ -185,13 +185,14 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 						CURLOPT_FOLLOWLOCATION => TRUE,
 						CURLOPT_MAXREDIRS => 3,
 						CURLOPT_CONNECTTIMEOUT => 30,
+						CURLOPT_TIMEOUT => 60,
 						CURLOPT_RETURNTRANSFER => TRUE,
 						CURLOPT_SSL_VERIFYPEER => FALSE,
 						//CURLOPT_HEADER => TRUE,
 						CURLOPT_URL => $url);
 		
 		// Options and parameters for basic authentication
-		$options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC; //FIXME OAuth
+		$options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC; //FIXME Implement OAuth
 		$options[CURLOPT_USERPWD] = $this->jiveUserPwd; 
 			
 		global $conf;
@@ -264,17 +265,49 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 		}
 	
 		$curl = curl_init();
-		curl_setopt($curl, CURLOPT_URL, $url);
-		curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
-		curl_setopt($curl, CURLOPT_HTTPHEADER, 
-					array('Content-type: application/json', 'Content-length: '.strlen($json)));
-		curl_setopt($curl, CURLOPT_POSTFIELDS, $json);
-		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-		curl_setopt($curl, CURLOPT_USERPWD, $this->jiveUserPwd);
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, TRUE);
-		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
-		curl_setopt($curl, CURLOPT_TIMEOUT, 20);
-	
+		curl_reset($curl);
+		
+		$options = array(CURLOPT_CUSTOMREQUEST => 'POST',
+				CURLOPT_HTTPHEADER =>
+					array('Content-type: application/json', 'Content-length: '.strlen($json)),
+				CURLOPT_POSTFIELDS => $json,
+				CURLOPT_FOLLOWLOCATION => TRUE,
+				CURLOPT_MAXREDIRS => 3,
+				CURLOPT_CONNECTTIMEOUT => 30,
+				CURLOPT_TIMEOUT => 60,
+				CURLOPT_RETURNTRANSFER => TRUE,
+				CURLOPT_SSL_VERIFYPEER => FALSE,
+				//CURLOPT_HEADER => TRUE,
+				CURLOPT_URL => $url);
+		
+		// Options and parameters for basic authentication
+		$options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC; //FIXME Implement OAuth
+		$options[CURLOPT_USERPWD] = $this->jiveUserPwd;
+			
+		global $conf;
+		// Options and parameters for proxy tunnelling
+		if (isset($conf['proxy']['host']) && ($conf['proxy']['host'] != '') ) {
+			$options[CURLOPT_PROXY] = $conf['proxy']['host'];
+			$option[CURLOPT_HTTPPROXYTUNNEL] = TRUE;
+			if (isset($conf['proxy']['port']) && ($conf['proxy']['port'] != '') )
+				$options[CURLOPT_PROXYPORT] = $conf['proxy']['port'];
+			if (isset($conf['proxy']['user']) && ($conf['proxy']['user'] != '') ) {
+				$options[CURLOPT_PROXYUSERPWD] = $conf['proxy']['user'].':'.$conf['proxy']['pass'];
+				$options[CURLOPT_PROXYAUTH] = CURLAUTH_BASIC;
+			}
+			if (isset($conf['proxy']['ssl']) && ($conf['proxy']['ssl'] == 1) ) {
+				$this->jiveErrMsg = 'getJiveData() does not support SSL proxy';
+				curl_close($curl);
+				return FALSE;
+			}
+		}
+		
+		if (curl_setopt_array($curl, $options) === FALSE) {
+			$this->jiveErrMsg = 'Cannot set option(s) for cURL - cURL error: "'.curl_error($curl).'"';
+			curl_close($curl);
+			return FALSE;
+		}
+
 		$result = curl_exec($curl);
 	
 		// Check the result
