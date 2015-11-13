@@ -16,4 +16,4 @@ $lang['JiveDiscussionLike']		= 'Recommandation(s) : ';
 $lang['JiveDiscussionReply']	= 'Réponse(s) : ';
 $lang['jiveDiscussionLastMsg']	= 'Dernier message';
 $lang['jiveDiscussionLastMsg2']	= ' de ';
-$lang['jiveDiscussionLastMsg3']	= ' posté le ';
+$lang['jiveDiscussionLastMsg3']	= ' posté à %H:%M le %x'; //format strftime

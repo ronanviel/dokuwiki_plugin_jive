@@ -194,7 +194,8 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		$meta = p_get_metadata(cleanID($ID), 'relation jive_plugin');
 				
 		if ($meta === NULL || !isset($meta['discussion_html']) || ($html = $meta['discussion_html']) == '') {
-  			$data = sprintf($this->getLang('createJiveDiscussion'), 
+  			// No discussion yet - show a link to initiate it
+			$data = sprintf($this->getLang('createJiveDiscussion'), 
   							DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
   							$extern);		
 		} else {
@@ -241,7 +242,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 							if (isset($info['list'][0]['updated'])) {
 								setlocale(LC_TIME, $conf['lang']);
 								$time = strtotime($info['list'][0]['updated']);
-								$data .= $this->getLang('jiveDiscussionLastMsg3').strftime('%c', $time);
+								$data .= strftime($this->getLang('jiveDiscussionLastMsg3'), $time);
 							}
 							if (isset($info['list'][0]['content']['text']))
 								$data .= '<div class="discussion__msg">'.$info['list'][0]['content']['text'].'</div>';

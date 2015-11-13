@@ -9,7 +9,8 @@
 class action_plugin_jive extends DokuWiki_Action_Plugin {
 
 	public function register(Doku_Event_Handler $controller) {
-		$controller->register_hook(ACTION_ACT_PREPROCESS, BEFORE, $this, 'handle_act_preprocess');
+		$controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_act_preprocess');
+		$controller->register_hook('PARSER_CACHE_USE', 'BEFORE', $this, 'check_cache_validity');
 	}
 	
 	public function handle_act_preprocess(&$event, $param) {
@@ -26,7 +27,25 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 				default:
 					break;	// Unknown keyword - do nothing
 			}
-		return;
+	}
+	
+	public function check_cache_validity(&$event, $param) {
+		global $ID;
+		
+		$cache = &$event->data;
+		if (!isset($cache->page))
+			return;
+		if ($cache->mode != 'i')
+			return;
+		
+		$meta = p_get_metadata(cleanID($ID), 'relation jive_plugin');
+		if ($meta !== NULL && isset($meta['discussion_html'])) {
+			// There is a discussion on this page
+			$event->preventDefault();
+			$event->stopPropagation();
+			$event->depends['purge'] = TRUE;
+		}
+		
 	}
 	
 	
@@ -110,5 +129,7 @@ class action_plugin_jive extends DokuWiki_Action_Plugin {
 		return $info['resources']['html']['ref'];
 		
 	}
+	
+
 	
 }

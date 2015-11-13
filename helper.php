@@ -36,6 +36,12 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				'return' => array('json' => 'string')
 		);
 		$result[] = array(
+				'name' => 'postJiveData',
+				'desc' => 'returns JSON data on success or FALSE on error with a message set in jiveErrMsg.',
+				'params' => array('service' => 'string', 'json' => 'string'),
+				'return' => array('json' => 'string')
+		);
+		$result[] = array(
 				'name' => 'getJiveGroup',
 				'desc' => 'returns a JSON encoded string containing \'placeID\' and \'resources\'.\'html\' 
 							or NULL on error',
@@ -51,6 +57,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	private $jiveServerURL = NULL;
 	private $jiveAPI = NULL;
 	private $jiveVersion = NULL;
+	
 	
 	/**
 	 * Initialize the Jive server variables from the plugin configuration and a call
@@ -218,21 +225,30 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			curl_close($curl);
 			return FALSE;
 		}
-		$result = curl_exec($curl);
-	
-		// Check the result
-		if ($result === FALSE) {
-			$this->jiveErrMsg = 'cURL error "'.curl_error($curl).'" for URL '.$url;
-			if (isset($options[CURLOPT_PROXY]))
-				$this->jiveErrMsg .= ' with proxy '.$options[CURLOPT_PROXY].':'.$options[CURLOPT_PROXYPORT];
-			curl_close($curl);
-			return FALSE;
-		}
+
+		$connectionTentatives = 2;
+		do {
+			$result = curl_exec($curl);
+
+			if ($result === FALSE) {
+				if (curl_errno($curl) == 'CURLE_OPERATION_TIMEDOUT') {
+					$connectionTentatives -= 1;
+				} else {
+					$this->jiveErrMsg = 'cURL error "'.curl_error($curl).'" for URL '.$url;
+					if (isset($options[CURLOPT_PROXY]))
+						$this->jiveErrMsg .= ' with proxy '.$options[CURLOPT_PROXY].':'.$options[CURLOPT_PROXYPORT];
+					curl_close($curl);
+					return FALSE;
+				}
+			} else $connectionTentatives = 0;
+		} while($connectionTentatives);
+		
 		if ($result == '') {
 			$this->jiveErrMsg = 'Unknown error. Is the URL correct?';
 			curl_close($curl);
 			return FALSE;
 		}
+					
 		curl_close($curl);
 	
 		// Strip the JSON security string
@@ -308,14 +324,21 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			return FALSE;
 		}
 
-		$result = curl_exec($curl);
+		$connectionTentatives = 2;
+		do {
+			$result = curl_exec($curl);
 	
-		// Check the result
-		if ($result === FALSE) {
-			$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL ('.$url.')';
-			curl_close($curl);
-			return FALSE;
-		}
+			if ($result === FALSE) {
+				if (curl_errno($curl) == 'CURLE_OPERATION_TIMEDOUT') {
+					$connectionTentatives -= 1;
+				} else {
+					$this->jiveErrMsg = 'curl error "'.curl_error($curl).'" for URL ('.$url.')';
+					curl_close($curl);
+					return FALSE;
+				}
+			} else $connectionTentatives = 0;
+		} while($connectionTentatives);
+			
 		if ($result == '') {
 			$this->jiveErrMsg = 'Unknown error. Is the URL correct?';
 			curl_close($curl);
