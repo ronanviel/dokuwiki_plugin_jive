@@ -128,15 +128,11 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			return array(FALSE, NULL);
 		}
 	
-		if ($jive->initJiveServer() === FALSE) {
-			msg('Failed to contact the Jive server: '.$jive->jiveLastErrorMsg(), -1);
-			return array(FALSE, NULL);
-		}
-		
-		if (($placeID = $jive->getJiveGroup(NULL)) !== NULL)
-			if (($data = $jive->getJiveData('/places/'.$placeID)) !== FALSE) {
+		if (($placeID = $jive->jiveGetDiscussionGroup(NULL)) !== NULL)
+			if (($data = $jive->jiveRequestAPI('GET', '/places/'.$placeID, NULL)) !== FALSE) {
 				$info = json_decode($data, TRUE);
-				if (isset($info['placeID']) && strcmp($info['placeID'],$placeID) == 0) {
+				//FIXME stcmp() call seems useless - check for error in JSON
+				if (!isset($info['Error'])) {
 					msg("Jive group (placeID=".$placeID.") already exists - nothing to do.");
 					return array(FALSE, NULL);
 				}
@@ -160,17 +156,16 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		}
 		
 		// Call API to create group
-		if (($resp = $jive->postJiveData('/places', $json)) === FALSE) {
+		if (($resp = $jive->jiveRequestAPI('POST', '/places', $json)) === FALSE) {
 			msg('Failed to create group: '.$jive->jiveLastErrorMsg(), -1);
 			return array(FALSE, NULL);
 		}
 		
 		// Get the placeID for the group created
-		if (($placeID = $jive->getJiveGroup($resp)) === NULL) {
+		if (($placeID = $jive->jiveGetDiscussionGroup($resp)) === NULL) {
 			msg('Failed to get group ID: '.$jive->jiveLastErrorMsg()."See JSON data below", -1);
 			return array(FALSE, "JSON data returned:<br>".$resp);
 		}
-			
 			
 		msg("Jive group (placeID=".$placeID.") created on Jive server and stored in Wiki configuration.", 1);
 		return array(FALSE, 'You should now delete this Jive plugin statement in this page source.');
@@ -194,65 +189,79 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		$meta = p_get_metadata(cleanID($ID), 'relation jive_plugin');
 				
 		if ($meta === NULL || !isset($meta['discussion_html']) || ($html = $meta['discussion_html']) == '') {
-  			// No discussion yet - show a link to initiate it
+			// No discussion yet - show a link to initiate it
 			$data = sprintf($this->getLang('createJiveDiscussion'), 
-  							DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
-  							$extern);		
-		} else {
-			// Show the link to the discussion
-			if (($jive = $this->loadHelper('jive')) === NULL) {
-				msg('Cannot load helper for jive plugin.', -1);
-				return array(FALSE, NULL);
-			}
+							DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
+							$extern);		
+			return array(FALSE, $data);
+		}
 		
-			if ($jive->initJiveServer() === FALSE) {
-				msg('Failed to contact the Jive server: '.$jive->jiveLastErrorMsg(), -1);
-				return array(FALSE, NULL);
-			}
+		// Show the link to the discussion
+		if (($jive = $this->loadHelper('jive')) === NULL) {
+			msg('Cannot load helper for jive plugin.', -1);
+			return array(FALSE, NULL);
+		}
+		
+		if (!isset($meta['discussion_contentID']) || ($contentID = $meta['discussion_contentID']) == '') {
+			msg('Failed to get the contentID for discussion. Please reset it with the syntax "{{jive>init?discussion}}"', -1);
+			return array(FALSE, NULL);
+		}
 			
-			if (!isset($meta['discussion_contentID']) || ($contentID = $meta['discussion_contentID']) == '') {
-				msg('Failed to get the contentID for discussion. Please reset it with the syntax "{{jive>init?discussion}}"', -1);
-				return array(FALSE, NULL);
-			}
+		
+		if (($resp = $jive->jiveRequestAPI('GET', '/contents/'.$contentID, NULL)) === FALSE) {
+			msg('Failed to connect to server. Error: '.$jive->jiveLastErrorMsg(), -1);
+			return array(FALSE, NULL);
+		}
+		
+		$info = json_decode($resp, TRUE);
+		if ($jiveInfo === NULL && json_last_error() !== JSON_ERROR_NONE) {
+			msg('JSON error: '.json_last_error_msg(),-1);
+			return array(FALSE, NULL);
+		}
 			
-			$data = '<div class="discussion__stats">';
-			if (($resp = $jive->getJiveData('/contents/'.$contentID)) !== FALSE) {
-				$info = json_decode($resp, TRUE);
+		// Check for error
+		if (isset($info["error"])) {
+			$data = sprintf($this->getLang('createJiveDiscussion'),
+					DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
+					$extern);
+			return array(FALSE, $data);
+		}
+		
+		$data = '<div class="discussion__stats">';
+		// Show information about the discussion
+		if (isset($info['followerCount']))
+			$data .= $this->getLang('JiveDiscussionFollower').$info['followerCount'].', ';	
+		if (isset($info['likeCount']))
+			$data .= $this->getLang('JiveDiscussionLike').$info['likeCount'].', ';
+		if (isset($info['replyCount'])) {
+			$data .= $this->getLang('JiveDiscussionReply').$info['replyCount'];
 				
-				// Show information about the discussion
-				if (isset($info['followerCount']))
-					$data .= $this->getLang('JiveDiscussionFollower').$info['followerCount'].', ';	
-				if (isset($info['likeCount']))
-					$data .= $this->getLang('JiveDiscussionLike').$info['likeCount'].', ';
-				if (isset($info['replyCount'])) {
-					$data .= $this->getLang('JiveDiscussionReply').$info['replyCount'];
-					
-					if ($info['replyCount'] > 0) {
-						$data .='</div><div class="discussion__lastmsg">'.$this->getLang('jiveDiscussionLastMsg');
+			if ($info['replyCount'] > 0) {
+				$data .='</div><div class="discussion__lastmsg">'.$this->getLang('jiveDiscussionLastMsg');
 						
-						$flags = '?startIndex='.($info['replyCount']-1).'&count=1';
-						$flags .= '&hierarchical=false'; //FIXME Check that API version is 3.1 or higher
+				$flags = '?startIndex='.($info['replyCount']-1).'&count=1';
+				$flags .= '&hierarchical=false';
 						
-						if (($resp = $jive->getJiveData('/messages/contents/'.$contentID.$flags)) !== FALSE) {
-							// Print the last message
-							$info = json_decode($resp, TRUE);
-							if (isset($info['list'][0]['author']['displayName']))
-								$data .= $this->getLang('jiveDiscussionLastMsg2')
-										.$info['list'][0]['author']['displayName'];
-							if (isset($info['list'][0]['updated'])) {
-								setlocale(LC_TIME, $conf['lang']);
-								$time = strtotime($info['list'][0]['updated']);
-								$data .= strftime($this->getLang('jiveDiscussionLastMsg3'), $time);
-							}
-							if (isset($info['list'][0]['content']['text']))
-								$data .= '<div class="discussion__msg">'.$info['list'][0]['content']['text'].'</div>';
-						}
+				if (($resp = $jive->jiveRequestAPI('GET',
+												'/messages/contents/'.$contentID.$flags,
+												NULL)) !== FALSE) {
+					// Print the last message
+					$info = json_decode($resp, TRUE);
+					if (isset($info['list'][0]['author']['displayName']))
+						$data .= $this->getLang('jiveDiscussionLastMsg2')
+								.$info['list'][0]['author']['displayName'];
+					if (isset($info['list'][0]['updated'])) {
+						setlocale(LC_TIME, $conf['lang']);
+						$time = strtotime($info['list'][0]['updated']);
+						$data .= strftime($this->getLang('jiveDiscussionLastMsg3'), $time);
 					}
+					if (isset($info['list'][0]['content']['text']))
+						$data .= '<div class="discussion__msg">'.$info['list'][0]['content']['text'].'</div>';
 				}
 			}
-			
-			$data .= '</div><p><b>'.sprintf($this->getLang('linkToJiveDiscussion'), $html, $extern).'</b></p>';
 		}
+		
+		$data .= '</div><p><b>'.sprintf($this->getLang('linkToJiveDiscussion'), $html, $extern).'</b></p>';
 		return array(FALSE, $data);
 	}
 
@@ -269,7 +278,7 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			return array(FALSE, NULL);
 		}
 		
-		if (($data = $jive->initJiveServer()) === FALSE) {
+		if (($data = $jive->jiveRequestAPI('GET', '/people?count=1', NULL)) === FALSE) {
 			msg('Ping failed with error: '.$jive->jiveLastErrorMsg(), -1);
 			return array(FALSE, NULL);
 		} 
@@ -280,13 +289,12 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			return array(FALSE, NULL);
 		}
 		
-		if (isset($jiveInfo['jiveCoreVersions']))
-			foreach ($jiveInfo['jiveCoreVersions'] as $elem)
-				if ($elem['version'] == 3)
-					$jiveAPIVersion = 'and API v3.'.$elem['revision'];
-		
-		msg('Ping OK on '.$jive->getJiveServerURL().' running Jive server v'
-				.$jiveInfo['jiveVersion'].$jiveAPIVersion);
+		if (isset($jiveInfo['Error'])) {
+			msg('Ping OK with error: '.$jiveInfo['Error']['message']);
+		} else {
+			$jiveServer = $jive->jiveGetServerConf();
+			msg('Ping OK on '.$jiveServer["apiUrl"]);
+		}
 		return array(FALSE, NULL);
 	}
 		

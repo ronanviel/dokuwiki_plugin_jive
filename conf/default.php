@@ -6,6 +6,6 @@
  * @author	   Ronan Viel <ronan.viel@orange.com>
  */
 
-$conf['jiveServerURL']	= '!!not set!!';
-$conf['jiveServerUser']	= '!!not set!!';
-$conf['jiveServerPassword']	= '!!not set!!';
+$lang['jiveServerAPIURL']	= '!!not set!!';
+$lang['jiveServerUser']	= '!!not set!!';
+$lang['jiveServerPassword']	= '!!not set!!';
