@@ -6,7 +6,7 @@
  * @author	   Ronan Viel <ronan.viel@orange.com>
  */
 
-$meta['jiveServerURL']		= array('string');
+$meta['jiveServerAPIURL']		= array('string');
 $meta['jiveServerUser']		= array('string');
 $meta['jiveServerPassword']	= array('password');
  

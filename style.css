@@ -15,7 +15,7 @@
 	padding-right: 0.5em;
 }
 
-.dokuwiki div.jiveplugin__section div.title {
+.dokuwiki div.jiveplugin__section div.discussion__title {
 	font-family: AvenirNextLTW01-Regular,Avenir-Regular,Helvetica,Arial,sans-serif;
 	font-size: 24px;
 	color: rgb(0, 136, 225);
@@ -28,7 +28,7 @@
 	font-weight: bold;
 }
 
-.dokuwiki div.jiveplugin__section div.discussion__msg {
+.dokuwiki div.jiveplugin__section div.discussion__lastmsg {
 	border: 0px none;
 	background: none repeat scroll 0% 0% rgb(255, 255, 255);
 	box-shadow: 1px 1px 2px 2px rgba(0, 0, 0, 0.1);
