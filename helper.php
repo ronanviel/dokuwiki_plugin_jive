@@ -112,7 +112,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 	 */
 	public function jiveRequestAPI($method, $svc, $data) {
 			
-		if ($jiveServer = $this->jiveGetServerConf() === NULL) return FALSE;
+		if (($jiveServer = $this->jiveGetServerConf()) === NULL) return FALSE;
 		
 		if ($svc === NULL || $svc == '') {
 			$this->jiveErrMsg = 'requestJiveAPI() error: missing service';
@@ -129,7 +129,6 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				CURLOPT_TIMEOUT => 60,
 				CURLOPT_RETURNTRANSFER => TRUE,
 				CURLOPT_SSL_VERIFYPEER => FALSE,
-				//CURLOPT_HEADER => TRUE,
 				CURLOPT_URL => $jiveServer["apiUrl"].$svc
 				);
 	
@@ -150,16 +149,16 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				break;
 			default: $this->jiveErrMsg = 'requestJiveAPI() Error: method not implemented';
 		}
-		
+	
 		// Options and parameters for basic authentication
 		$curlOptions[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
-		$curlOptions[CURLOPT_USERPWD] = $this->jiveUserPwd;
+		$curlOptions[CURLOPT_USERPWD] = $jiveServer["credentials"];
 			
 		global $conf;
 		// Options and parameters for proxy tunnelling
 		if (isset($conf['proxy']['host']) && ($conf['proxy']['host'] != '') ) {
 			$curlOptions[CURLOPT_PROXY] = $conf['proxy']['host'];
-			$option[CURLOPT_HTTPPROXYTUNNEL] = TRUE;
+			$curlOptions[CURLOPT_HTTPPROXYTUNNEL] = TRUE;
 			if (isset($conf['proxy']['port']) && ($conf['proxy']['port'] != '') )
 				$curlOptions[CURLOPT_PROXYPORT] = $conf['proxy']['port'];
 			if (isset($conf['proxy']['user']) && ($conf['proxy']['user'] != '') ) {
@@ -167,7 +166,7 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 				$curlOptions[CURLOPT_PROXYAUTH] = CURLAUTH_BASIC;
 			}
 			if (isset($conf['proxy']['ssl']) && ($conf['proxy']['ssl'] == 1) ) {
-				$this->jiveErrMsg = 'getJiveData() does not support SSL proxy';
+				$this->jiveErrMsg = 'jiveRequestAPI() does not support SSL proxy';
 				curl_close($curl);
 				return FALSE;
 			}
@@ -179,7 +178,8 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 			curl_close($curl);
 			return FALSE;
 		}
-	
+			
+		$result = '';
 		$connectionTentatives = 2;	// Retry 1 time on operation timeout
 		do {
 			$result = curl_exec($curl);
@@ -196,7 +196,9 @@ Class helper_plugin_jive extends DokuWiki_Plugin {
 					curl_close($curl);
 					return FALSE;
 				}
-			} else $connectionTentatives = 0;
+			} else {
+				$connectionTentatives = 0;
+			}
 		} while($connectionTentatives != 0);
 			
 		if ($result == '') {

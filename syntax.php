@@ -190,10 +190,11 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 		
 		global $ID;
 		$meta = p_get_metadata(cleanID($ID), 'relation jive_plugin');
+		$data = '<div class="discussion__title">'.$this->getLang('discussionTitle').'</div>';
 				
 		if ($meta === NULL || !isset($meta['discussion_html']) || ($html = $meta['discussion_html']) == '') {
 			// No discussion yet - show a link to initiate it
-			$data = sprintf($this->getLang('createJiveDiscussion'), 
+			$data .= sprintf($this->getLang('createJiveDiscussion'), 
 							DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
 							$extern);		
 			return array(FALSE, $data);
@@ -221,16 +222,15 @@ class syntax_plugin_jive extends DokuWiki_Syntax_Plugin {
 			msg('JSON error: '.json_last_error_msg(),-1);
 			return array(FALSE, NULL);
 		}
-			
+		
 		// Check for error
 		if (isset($info["error"])) {
-			$data = sprintf($this->getLang('createJiveDiscussion'),
+			$data .= sprintf($this->getLang('createJiveDiscussion'),
 					DOKU_URL.'/doku.php?id='.$ID.'&do=jive_create_discussion',
 					$extern);
 			return array(FALSE, $data);
 		}
 		
-		$data = '<div class="title">'.$this->getLang('discussionTitle').'</div>';
 		$stats = '';
 		$lastMsgHeader = '';
 		$lastMsg = '';
